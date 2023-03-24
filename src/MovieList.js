@@ -1,15 +1,20 @@
 import { useState } from "react";
 import {
+  Alert,
   Button,
   List,
   ListItem,
   ListItemText,
+  Snackbar,
   TextField,
   Typography,
 } from "@mui/material";
 
 function MovieList({ category, movies, onMovieAdd, onMovieDelete }) {
   const [inputValue, setInputValue] = useState("");
+  const [deletedMovie, setDeletedMovie] = useState(null);
+  const [addedMovie, setAddedMovie] = useState(null); // new state variable
+  const [openSnackbar, setOpenSnackbar] = useState(false);
 
   const handleInputChange = (event) => {
     setInputValue(event.target.value);
@@ -18,12 +23,21 @@ function MovieList({ category, movies, onMovieAdd, onMovieDelete }) {
   const handleAddMovie = () => {
     if (inputValue.trim() !== "") {
       onMovieAdd(category, inputValue);
+      setAddedMovie(inputValue); // set the new state variable to the movie title
       setInputValue("");
+      setOpenSnackbar(true);
     }
   };
 
   const handleDeleteMovie = () => {
-    onMovieDelete(category);
+    const movieToDelete = onMovieDelete(category);
+    if (movieToDelete) {
+      setDeletedMovie(movieToDelete.title);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
   return (
@@ -36,6 +50,11 @@ function MovieList({ category, movies, onMovieAdd, onMovieDelete }) {
         value={inputValue}
         onChange={handleInputChange}
         sx={{ mr: 2, mt: 2 }}
+        onKeyPress={(event) => {
+          if (event.key === "Enter") {
+            handleAddMovie();
+          }
+        }}
       />
       <Button variant="contained" onClick={handleAddMovie} sx={{ mt: 2 }}>
         Add
@@ -47,18 +66,39 @@ function MovieList({ category, movies, onMovieAdd, onMovieDelete }) {
       >
         Pop
       </Button>
-      {movies.length > 0 ? (
-        <List sx={{ mt: 2 }}>
-          {movies.map((movie, index) => (
-            <ListItem key={index}>
-              <ListItemText primary={movie} />
-            </ListItem>
-          ))}
-        </List>
-      ) : (
-        <Typography sx={{ mt: 2 }}>
-          No movies added to this category yet.
-        </Typography>
+      {deletedMovie && (
+        <Alert icon={false} color="info" sx={{ mt: 2 }}>
+          <Typography variant="h5">
+            Let's watch{" "}
+            {deletedMovie
+              .split(" ")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ")}
+            !
+          </Typography>
+        </Alert>
+      )}
+
+      {movies.length === 0 ? (
+        <Typography sx={{ mt: 2 }}>That's the end of your list.</Typography>
+      ) : null}
+      {addedMovie && (
+        <Snackbar
+          open={openSnackbar}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+        >
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity="success"
+            sx={{ width: "100%" }}
+          >
+            {`${addedMovie
+              .split(" ")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ")} successfully added!`}
+          </Alert>
+        </Snackbar>
       )}
     </div>
   );

@@ -79,7 +79,7 @@ function App() {
       });
       objectStore.createIndex("category", "category", { unique: false });
     };
-  }, [categoryItems]);
+  }, []);
 
   const onMovieAdd = (category, movie) => {
     const transaction = db.transaction(["movies"], "readwrite");
@@ -106,16 +106,17 @@ function App() {
     const categoryMovies = movies[category];
     if (categoryMovies.length === 0) {
       console.warn("No movies in category", category);
-      return;
+      return null;
     }
-    const [oldestMovie, ...remainingMovies] = movies[category];
+    const randomIndex = Math.floor(Math.random() * categoryMovies.length);
+    const [deletedMovie] = categoryMovies.splice(randomIndex, 1);
     const transaction = db.transaction(["movies"], "readwrite");
     const objectStore = transaction.objectStore("movies");
-    const request = objectStore.delete(oldestMovie.id);
+    const request = objectStore.delete(deletedMovie.id);
     request.onsuccess = () => {
       setMovies((prevState) => ({
         ...prevState,
-        [category]: remainingMovies,
+        [category]: categoryMovies,
       }));
     };
     request.onerror = (event) => {
@@ -124,6 +125,7 @@ function App() {
         event.target.error
       );
     };
+    return deletedMovie;
   };
 
   const handleCategoryChange = (event) => {
@@ -144,8 +146,10 @@ function App() {
       return;
     }
 
+    const newCategoryItems = [...categoryItems, newCategoryTrimmed].sort();
+
     setNewCategory("");
-    setCategoryItems((prevState) => [...prevState, newCategoryTrimmed]);
+    setCategoryItems(newCategoryItems);
     setMovies((prevState) => ({
       ...prevState,
       [newCategoryTrimmed]: [],
@@ -205,6 +209,11 @@ function App() {
             value={newCategory}
             onChange={handleNewCategoryChange}
             sx={{ mr: 1 }}
+            onKeyPress={(event) => {
+              if (event.key === "Enter") {
+                handleNewCategorySubmit();
+              }
+            }}
           />
           <Button
             variant="contained"
@@ -224,22 +233,24 @@ function App() {
           width: "100%",
         }}
       >
-        {Object.keys(filteredMovies).map((category) => {
-          const movieTitles = filteredMovies[category]
-            ? filteredMovies[category].map((movie) => movie.title)
-            : [];
-          console.log(category, movieTitles);
+        {Object.keys(filteredMovies)
+          .sort()
+          .map((category) => {
+            const movieTitles = filteredMovies[category]
+              ? filteredMovies[category].map((movie) => movie.title)
+              : [];
+            console.log(category, movieTitles);
 
-          return (
-            <MovieList
-              key={category}
-              category={category}
-              movies={movieTitles}
-              onMovieAdd={onMovieAdd}
-              onMovieDelete={onMovieDelete}
-            />
-          );
-        })}
+            return (
+              <MovieList
+                key={category}
+                category={category}
+                movies={movieTitles}
+                onMovieAdd={onMovieAdd}
+                onMovieDelete={onMovieDelete}
+              />
+            );
+          })}
       </Box>
     </Container>
   );
