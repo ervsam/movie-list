@@ -79,7 +79,7 @@ function App() {
       });
       objectStore.createIndex("category", "category", { unique: false });
     };
-  }, []);
+  }, [categoryItems]);
 
   const onMovieAdd = (category, movie) => {
     const transaction = db.transaction(["movies"], "readwrite");
