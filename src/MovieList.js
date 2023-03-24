@@ -1,14 +1,5 @@
 import { useState } from "react";
-import {
-  Alert,
-  Button,
-  List,
-  ListItem,
-  ListItemText,
-  Snackbar,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Alert, Button, Snackbar, TextField, Typography } from "@mui/material";
 
 function MovieList({ category, movies, onMovieAdd, onMovieDelete }) {
   const [inputValue, setInputValue] = useState("");
