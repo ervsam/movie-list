@@ -29,56 +29,14 @@ function App() {
 
   useEffect(() => {
     const request = indexedDB.open("movies", 1);
-
     request.onerror = (event) => {
       console.error("Failed to open indexedDB:", event.target.error);
     };
-
     request.onsuccess = (event) => {
       const db = event.target.result;
       setDb(db);
-
-      // Load the data from the database and set it as the initial state
-      const transaction = db.transaction("movies");
-      const objectStore = transaction.objectStore("movies");
-
-      const uniqueCategories = new Set(categoryItems);
-      objectStore.openCursor().onsuccess = (event) => {
-        const cursor = event.target.result;
-        if (cursor) {
-          const category = cursor.value.category;
-          uniqueCategories.add(category);
-          cursor.continue();
-        } else {
-          const categories = {};
-          uniqueCategories.forEach((category) => {
-            categories[category] = [];
-          });
-          objectStore.openCursor().onsuccess = (event) => {
-            const cursor = event.target.result;
-            if (cursor) {
-              const category = cursor.value.category;
-              const title = cursor.value.title;
-              const id = cursor.key;
-              categories[category].push({ id, title });
-              cursor.continue();
-            } else {
-              setMovies(categories);
-            }
-          };
-        }
-      };
     };
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      const objectStore = db.createObjectStore("movies", {
-        keyPath: "id",
-        autoIncrement: true,
-      });
-      objectStore.createIndex("category", "category", { unique: false });
-    };
-  }, [categoryItems]);
+  }, []);
 
   const onMovieAdd = (category, movie) => {
     const transaction = db.transaction(["movies"], "readwrite");
