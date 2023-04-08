@@ -64,7 +64,6 @@ function App() {
               cursor.continue();
             } else {
               setMovies(categories);
-              setCategoryItems(Array.from(uniqueCategories));
             }
           };
         }
@@ -79,7 +78,7 @@ function App() {
       });
       objectStore.createIndex("category", "category", { unique: false });
     };
-  }, [newCategory]);
+  }, [categoryItems]);
 
   const onMovieAdd = (category, movie) => {
     const transaction = db.transaction(["movies"], "readwrite");
