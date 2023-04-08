@@ -27,18 +27,71 @@ function App() {
   ]);
   const [db, setDb] = useState(null);
 
+  const DEBUG = true;
+
+  if (DEBUG) console.log("App");
+
+
   useEffect(() => {
     const request = indexedDB.open("movies", 1);
+
     request.onerror = (event) => {
       console.error("Failed to open indexedDB:", event.target.error);
     };
+
     request.onsuccess = (event) => {
       const db = event.target.result;
       setDb(db);
+
+      // Load the data from the database and set it as the initial state
+      const transaction = db.transaction("movies");
+      const objectStore = transaction.objectStore("movies");
+
+      const uniqueCategories = new Set([
+        "action",
+        "comedy",
+        "drama",
+      ]);
+      objectStore.openCursor().onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const category = cursor.value.category;
+          uniqueCategories.add(category);
+          cursor.continue();
+        } else {
+          const categories = {};
+          uniqueCategories.forEach((category) => {
+            categories[category] = [];
+          });
+          objectStore.openCursor().onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+              const category = cursor.value.category;
+              const title = cursor.value.title;
+              const id = cursor.key;
+              categories[category].push({ id, title });
+              cursor.continue();
+            } else {
+              setMovies(categories);
+            }
+          };
+        }
+      };
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      const objectStore = db.createObjectStore("movies", {
+        keyPath: "id",
+        autoIncrement: true,
+      });
+      objectStore.createIndex("category", "category", { unique: false });
     };
   }, []);
 
   const onMovieAdd = (category, movie) => {
+    if (DEBUG) console.log("onMovieAdd");
+    
     const transaction = db.transaction(["movies"], "readwrite");
     const objectStore = transaction.objectStore("movies");
     const request = objectStore.add({
@@ -60,6 +113,8 @@ function App() {
   };
 
   const onMovieDelete = (category) => {
+    if (DEBUG) console.log("onMovieDelete");
+
     const categoryMovies = movies[category];
     if (categoryMovies.length === 0) {
       console.warn("No movies in category", category);
@@ -86,14 +141,18 @@ function App() {
   };
 
   const handleCategoryChange = (event) => {
+    if (DEBUG) console.log("handleCategoryChange");
     setSelectedCategory(event.target.value);
   };
 
   const handleNewCategoryChange = (event) => {
+    if (DEBUG) console.log("handleNewCategoryChange");
     setNewCategory(event.target.value);
   };
 
   const handleNewCategorySubmit = async () => {
+    if (DEBUG) console.log("handleNewCategorySubmit");
+
     const newCategoryTrimmed = newCategory.trim();
     if (newCategoryTrimmed === "") {
       return;
