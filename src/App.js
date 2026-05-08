@@ -12,24 +12,28 @@ import {
   ThemeProvider,
   CssBaseline,
   InputAdornment,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import CasinoIcon from "@mui/icons-material/Casino";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
+import LogoutIcon from "@mui/icons-material/Logout";
 import MovieList from "./MovieList";
 import PickModal from "./PickModal";
+import Auth from "./Auth";
 import theme from "./theme";
+import { supabase } from "./supabase";
 
 const DEFAULT_CATEGORIES = ["action", "comedy", "drama"];
-const DB_NAME = "movies";
-const DB_VERSION = 2;
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const [movies, setMovies] = useState({});
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [newCategory, setNewCategory] = useState("");
-  const [db, setDb] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [pickedMovie, setPickedMovie] = useState(null);
   const [pickModalOpen, setPickModalOpen] = useState(false);
@@ -37,115 +41,114 @@ function App() {
   const [pickSource, setPickSource] = useState(null);
 
   useEffect(() => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = (event) => {
-      console.error("Failed to open indexedDB:", event.target.error);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      const { oldVersion } = event;
-
-      if (oldVersion < 1) {
-        const movieStore = db.createObjectStore("movies", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        movieStore.createIndex("category", "category", { unique: false });
-      }
-      if (oldVersion < 2) {
-        db.createObjectStore("categories", { keyPath: "name" });
-      }
-    };
-
-    request.onsuccess = (event) => {
-      const database = event.target.result;
-      setDb(database);
-
-      const tx = database.transaction(["categories", "movies"], "readonly");
-      const catStore = tx.objectStore("categories");
-      const movieStore = tx.objectStore("movies");
-
-      const savedCategories = new Set(DEFAULT_CATEGORIES);
-      const allMovies = {};
-      DEFAULT_CATEGORIES.forEach((c) => { allMovies[c] = []; });
-
-      catStore.getAll().onsuccess = (e) => {
-        e.target.result.forEach(({ name }) => savedCategories.add(name));
-      };
-
-      movieStore.getAll().onsuccess = (e) => {
-        e.target.result.forEach(({ id, category, title }) => {
-          savedCategories.add(category);
-          if (!allMovies[category]) allMovies[category] = [];
-          allMovies[category].push({ id, title });
-        });
-      };
-
-      tx.oncomplete = () => {
-        const catArray = Array.from(savedCategories).sort();
-        catArray.forEach((c) => { if (!allMovies[c]) allMovies[c] = []; });
-        setCategories(catArray);
-        setMovies(allMovies);
-      };
-    };
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoadingAuth(false);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const onMovieAdd = (category, title) => {
-    if (!db) return;
-    const tx = db.transaction(["movies"], "readwrite");
-    const store = tx.objectStore("movies");
-    const req = store.add({ category, title });
-    req.onsuccess = () => {
-      setMovies((prev) => ({
-        ...prev,
-        [category]: [...(prev[category] || []), { id: req.result, title }],
-      }));
-    };
+  useEffect(() => {
+    if (!session) {
+      setMovies({});
+      setCategories(DEFAULT_CATEGORIES);
+      return;
+    }
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  const loadData = async () => {
+    const userId = session.user.id;
+
+    const [{ data: catData }, { data: movieData }] = await Promise.all([
+      supabase.from("categories").select("name").eq("user_id", userId),
+      supabase
+        .from("movies")
+        .select("id, title, category")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true }),
+    ]);
+
+    const savedCategories = new Set(DEFAULT_CATEGORIES);
+    (catData || []).forEach(({ name }) => savedCategories.add(name));
+
+    const allMovies = {};
+    Array.from(savedCategories).forEach((c) => {
+      allMovies[c] = [];
+    });
+    (movieData || []).forEach(({ id, title, category }) => {
+      savedCategories.add(category);
+      if (!allMovies[category]) allMovies[category] = [];
+      allMovies[category].push({ id, title });
+    });
+
+    const catArray = Array.from(savedCategories).sort();
+    catArray.forEach((c) => {
+      if (!allMovies[c]) allMovies[c] = [];
+    });
+    setCategories(catArray);
+    setMovies(allMovies);
   };
 
-  const onMovieDeleteById = (category, id) => {
-    if (!db) return;
-    const tx = db.transaction(["movies"], "readwrite");
-    tx.objectStore("movies").delete(id).onsuccess = () => {
-      setMovies((prev) => ({
-        ...prev,
-        [category]: prev[category].filter((m) => m.id !== id),
-      }));
-    };
+  const onMovieAdd = async (category, title) => {
+    const { data, error } = await supabase
+      .from("movies")
+      .insert({ category, title, user_id: session.user.id })
+      .select()
+      .single();
+    if (error) { console.error(error); return; }
+    setMovies((prev) => ({
+      ...prev,
+      [category]: [...(prev[category] || []), { id: data.id, title }],
+    }));
   };
 
-  const addCategory = () => {
+  const onMovieDeleteById = async (category, id) => {
+    const { error } = await supabase.from("movies").delete().eq("id", id);
+    if (error) { console.error(error); return; }
+    setMovies((prev) => ({
+      ...prev,
+      [category]: prev[category].filter((m) => m.id !== id),
+    }));
+  };
+
+  const addCategory = async () => {
     const trimmed = newCategory.trim().toLowerCase();
     if (!trimmed || categories.includes(trimmed)) {
       setNewCategory("");
       return;
     }
-    if (db) {
-      const tx = db.transaction(["categories"], "readwrite");
-      tx.objectStore("categories").add({ name: trimmed });
+    if (!DEFAULT_CATEGORIES.includes(trimmed)) {
+      await supabase
+        .from("categories")
+        .insert({ name: trimmed, user_id: session.user.id });
     }
     setCategories((prev) => [...prev, trimmed].sort());
     setMovies((prev) => ({ ...prev, [trimmed]: [] }));
     setNewCategory("");
   };
 
-  const deleteCategory = (category) => {
-    if (!db) return;
-    const tx = db.transaction(["movies", "categories"], "readwrite");
-    const movieStore = tx.objectStore("movies");
-    const catIndex = movieStore.index("category");
-    catIndex.openCursor(IDBKeyRange.only(category)).onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor) {
-        cursor.delete();
-        cursor.continue();
-      }
-    };
-    if (!DEFAULT_CATEGORIES.includes(category)) {
-      tx.objectStore("categories").delete(category);
-    }
+  const deleteCategory = async (category) => {
+    await Promise.all([
+      supabase
+        .from("movies")
+        .delete()
+        .eq("category", category)
+        .eq("user_id", session.user.id),
+      DEFAULT_CATEGORIES.includes(category)
+        ? Promise.resolve()
+        : supabase
+            .from("categories")
+            .delete()
+            .eq("name", category)
+            .eq("user_id", session.user.id),
+    ]);
     setCategories((prev) => prev.filter((c) => c !== category));
     setMovies((prev) => {
       const updated = { ...prev };
@@ -209,19 +212,28 @@ function App() {
     setExcludeIds([]);
   };
 
-  const totalCount = Object.values(movies).reduce((sum, arr) => sum + arr.length, 0);
+  if (loadingAuth) return null;
 
+  if (!session) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Auth />
+      </ThemeProvider>
+    );
+  }
+
+  const totalCount = Object.values(movies).reduce((sum, arr) => sum + arr.length, 0);
   const displayCategories = selectedCategory === "all" ? categories : [selectedCategory];
 
   const filteredMovies = {};
   displayCategories.forEach((cat) => {
     const catMovies = movies[cat] || [];
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filteredMovies[cat] = catMovies.filter((m) => m.title.toLowerCase().includes(q));
-    } else {
-      filteredMovies[cat] = catMovies;
-    }
+    filteredMovies[cat] = searchQuery.trim()
+      ? catMovies.filter((m) =>
+          m.title.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : catMovies;
   });
 
   return (
@@ -229,7 +241,21 @@ function App() {
       <CssBaseline />
       <Container maxWidth="md" sx={{ pb: 8 }}>
         {/* Header */}
-        <Box sx={{ textAlign: "center", py: 5 }}>
+        <Box sx={{ textAlign: "center", py: 5, position: "relative" }}>
+          <Tooltip title="Sign out">
+            <IconButton
+              onClick={() => supabase.auth.signOut()}
+              sx={{
+                position: "absolute",
+                right: 0,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "text.secondary",
+              }}
+            >
+              <LogoutIcon />
+            </IconButton>
+          </Tooltip>
           <Typography
             variant="h3"
             sx={{ fontFamily: "Cinzel, serif", fontWeight: 700, color: "primary.main" }}
@@ -298,7 +324,11 @@ function App() {
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={addCategory}
-            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "text.primary", whiteSpace: "nowrap" }}
+            sx={{
+              borderColor: "rgba(255,255,255,0.2)",
+              color: "text.primary",
+              whiteSpace: "nowrap",
+            }}
           >
             Add Category
           </Button>
