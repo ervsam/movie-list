@@ -1,10 +1,14 @@
 -- Run this in the Supabase SQL editor: https://supabase.com/dashboard/project/_/sql
 
 create table if not exists movies (
-  id        bigserial primary key,
-  user_id   uuid references auth.users(id) on delete cascade not null,
-  title     text not null,
-  category  text not null,
+  id         bigserial primary key,
+  user_id    uuid references auth.users(id) on delete cascade not null,
+  title      text not null,
+  category   text not null,
+  year       int,
+  rating     numeric(3,1),
+  poster_url text,
+  tmdb_id    int,
   created_at timestamptz default now() not null
 );
 

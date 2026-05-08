@@ -5,6 +5,7 @@ import {
   Typography,
   Button,
   Chip,
+  Box,
 } from "@mui/material";
 import MovieIcon from "@mui/icons-material/Movie";
 import CasinoIcon from "@mui/icons-material/Casino";
@@ -29,7 +30,25 @@ function PickModal({ open, movie, onWatched, onPickAnother, onClose }) {
       }}
     >
       <DialogContent sx={{ textAlign: "center", pt: 5, pb: 2, px: 4 }}>
-        <MovieIcon sx={{ fontSize: 44, color: "primary.main", mb: 1.5 }} />
+        {movie.poster_url ? (
+          <Box
+            component="img"
+            src={movie.poster_url}
+            alt={movie.title}
+            sx={{
+              width: 110,
+              height: 165,
+              objectFit: "cover",
+              borderRadius: 2,
+              mx: "auto",
+              display: "block",
+              mb: 2.5,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
+            }}
+          />
+        ) : (
+          <MovieIcon sx={{ fontSize: 44, color: "primary.main", mb: 1.5 }} />
+        )}
         <Typography
           variant="overline"
           sx={{ color: "primary.main", letterSpacing: 4, display: "block", mb: 0.5 }}
@@ -38,16 +57,17 @@ function PickModal({ open, movie, onWatched, onPickAnother, onClose }) {
         </Typography>
         <Typography
           variant="h4"
-          sx={{
-            fontFamily: "Cinzel, serif",
-            fontWeight: 700,
-            mt: 1,
-            mb: 2,
-            lineHeight: 1.3,
-          }}
+          sx={{ fontFamily: "Cinzel, serif", fontWeight: 700, mt: 1, mb: 1, lineHeight: 1.3 }}
         >
           {movie.title}
         </Typography>
+        {(movie.year || movie.rating) && (
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
+            {movie.year}
+            {movie.year && movie.rating ? " · " : ""}
+            {movie.rating && `⭐ ${movie.rating}`}
+          </Typography>
+        )}
         <Chip
           label={movie.category.charAt(0).toUpperCase() + movie.category.slice(1)}
           size="small"

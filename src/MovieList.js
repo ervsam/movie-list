@@ -2,39 +2,33 @@ import { useState } from "react";
 import {
   Box,
   Typography,
-  TextField,
   Button,
   IconButton,
   List,
   ListItem,
-  ListItemText,
   Chip,
   Collapse,
   Snackbar,
   Alert,
   Tooltip,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CasinoIcon from "@mui/icons-material/Casino";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import MovieSearch from "./MovieSearch";
 
 function MovieList({ category, movies, onMovieAdd, onMovieDelete, onPickRandom, onDeleteCategory }) {
-  const [inputValue, setInputValue] = useState("");
   const [expanded, setExpanded] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: "" });
 
-  const handleAdd = () => {
-    const title = inputValue.trim();
-    if (!title) return;
-    onMovieAdd(category, title);
-    setInputValue("");
-    setSnackbar({ open: true, message: `"${title}" added!` });
-  };
-
   const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const handleAdd = (movieData) => {
+    onMovieAdd(category, movieData);
+    setSnackbar({ open: true, message: `"${movieData.title}" added!` });
+  };
 
   return (
     <Box
@@ -46,7 +40,7 @@ function MovieList({ category, movies, onMovieAdd, onMovieDelete, onPickRandom, 
         overflow: "hidden",
       }}
     >
-      {/* Category header */}
+      {/* Header */}
       <Box
         onClick={() => setExpanded((v) => !v)}
         sx={{
@@ -100,10 +94,10 @@ function MovieList({ category, movies, onMovieAdd, onMovieDelete, onPickRandom, 
             variant="body2"
             sx={{ px: 2.5, py: 2, color: "text.secondary", fontStyle: "italic" }}
           >
-            No movies yet — add one below.
+            No movies yet — search to add one below.
           </Typography>
         ) : (
-          <List dense disablePadding sx={{ maxHeight: 300, overflowY: "auto" }}>
+          <List dense disablePadding sx={{ maxHeight: 320, overflowY: "auto" }}>
             {movies.map((movie, index) => (
               <ListItem
                 key={movie.id}
@@ -123,18 +117,56 @@ function MovieList({ category, movies, onMovieAdd, onMovieDelete, onPickRandom, 
                   "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
                   py: 0.75,
                   pl: 2.5,
+                  alignItems: "center",
                 }}
               >
-                <ListItemText
-                  primary={movie.title}
-                  primaryTypographyProps={{ variant: "body2", sx: { pr: 4 } }}
-                />
+                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", minWidth: 0, pr: 4 }}>
+                  {/* Poster thumbnail */}
+                  {movie.poster_url ? (
+                    <Box
+                      component="img"
+                      src={movie.poster_url}
+                      alt={movie.title}
+                      sx={{
+                        width: 28,
+                        height: 42,
+                        objectFit: "cover",
+                        borderRadius: 0.5,
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: 28,
+                        height: 42,
+                        bgcolor: "rgba(255,255,255,0.06)",
+                        borderRadius: 0.5,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+
+                  {/* Title + meta */}
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                      {movie.title}
+                    </Typography>
+                    {(movie.year || movie.rating) && (
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {movie.year}
+                        {movie.year && movie.rating ? " · " : ""}
+                        {movie.rating && `⭐ ${movie.rating}`}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
               </ListItem>
             ))}
           </List>
         )}
 
-        {/* Add movie + pick random */}
+        {/* Search input + pick random */}
         <Box
           sx={{
             display: "flex",
@@ -145,24 +177,7 @@ function MovieList({ category, movies, onMovieAdd, onMovieDelete, onPickRandom, 
             alignItems: "center",
           }}
         >
-          <TextField
-            placeholder={`Add to ${capitalize(category)}…`}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleAdd()}
-            size="small"
-            sx={{ flex: 1 }}
-          />
-          <Tooltip title="Add movie">
-            <Button
-              variant="contained"
-              onClick={handleAdd}
-              size="small"
-              sx={{ color: "#000", minWidth: 36, px: 1.5 }}
-            >
-              <AddIcon fontSize="small" />
-            </Button>
-          </Tooltip>
+          <MovieSearch category={category} onAdd={handleAdd} />
           <Tooltip title="Pick random from this category">
             <span>
               <Button

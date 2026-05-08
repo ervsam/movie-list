@@ -70,7 +70,7 @@ function App() {
       supabase.from("categories").select("name").eq("user_id", userId),
       supabase
         .from("movies")
-        .select("id, title, category")
+        .select("id, title, category, year, rating, poster_url, tmdb_id")
         .eq("user_id", userId)
         .order("created_at", { ascending: true }),
     ]);
@@ -82,10 +82,10 @@ function App() {
     Array.from(savedCategories).forEach((c) => {
       allMovies[c] = [];
     });
-    (movieData || []).forEach(({ id, title, category }) => {
+    (movieData || []).forEach(({ id, title, category, year, rating, poster_url, tmdb_id }) => {
       savedCategories.add(category);
       if (!allMovies[category]) allMovies[category] = [];
-      allMovies[category].push({ id, title });
+      allMovies[category].push({ id, title, year, rating, poster_url, tmdb_id });
     });
 
     const catArray = Array.from(savedCategories).sort();
@@ -96,16 +96,34 @@ function App() {
     setMovies(allMovies);
   };
 
-  const onMovieAdd = async (category, title) => {
+  const onMovieAdd = async (category, movieData) => {
     const { data, error } = await supabase
       .from("movies")
-      .insert({ category, title, user_id: session.user.id })
+      .insert({
+        category,
+        title: movieData.title,
+        year: movieData.year || null,
+        rating: movieData.rating || null,
+        poster_url: movieData.poster_url || null,
+        tmdb_id: movieData.tmdb_id || null,
+        user_id: session.user.id,
+      })
       .select()
       .single();
     if (error) { console.error(error); return; }
     setMovies((prev) => ({
       ...prev,
-      [category]: [...(prev[category] || []), { id: data.id, title }],
+      [category]: [
+        ...(prev[category] || []),
+        {
+          id: data.id,
+          title: movieData.title,
+          year: movieData.year || null,
+          rating: movieData.rating || null,
+          poster_url: movieData.poster_url || null,
+          tmdb_id: movieData.tmdb_id || null,
+        },
+      ],
     }));
   };
 
